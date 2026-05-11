@@ -1,4 +1,5 @@
 @echo off
 
 @REM build
-devenv Build\win32_snake.exe
+@REM devenv Build\win32_snake.exe
+devenv .

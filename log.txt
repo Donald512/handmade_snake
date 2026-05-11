@@ -1,0 +1,1 @@
+LRESULT Wndproc(HWND param1, UINT param2, WPARAM param3, LPARAM param4){} must return an LRESULT, or DefWindowProc(...) or else window wont open
