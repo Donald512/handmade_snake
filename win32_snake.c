@@ -8,7 +8,7 @@
 #define boardWidth 640
 #define boardHeight 480
 #define bytesPerPixel 4
-
+#define size 10
 
 #define black 0x00000000
 #define white 0x00FFFFFF    // little endian, in memory stored ABGR
@@ -18,7 +18,8 @@ typedef uint8_t u8;
 typedef int8_t i8;
 typedef uint16_t u16;
 typedef uint32_t u32;
-typedef int32_t i64;
+typedef int32_t i32;
+typedef int64_t i64;
 typedef uint32_t bool32;
 
 u32 imageSize = boardWidth * boardHeight * bytesPerPixel;    // in bytes
@@ -27,7 +28,6 @@ u32 imageSize = boardWidth * boardHeight * bytesPerPixel;    // in bytes
 typedef struct{
     u16 x;
     u16 y;
-    u8 size;
 }   square;
 
 typedef struct{
@@ -35,20 +35,30 @@ typedef struct{
     i8 down;
 }   direction;
 
+
 LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info2);
 void createBoard();
 void addSquare(square sqr);
 void removeSquare(square sqr);
 void updateScreen(HDC deviceContext);
 void clearBoard();
+void addSnake(square snake[], u16 length);
+void addStructs(square *head, direction dir);
+void moveSnake(square snake[], u16 length);
+void DEBUGprintSnake(square snake[], u16 length);
 
 BITMAPINFO bmpInfo = {0};
 void* imagePtr = NULL;
 
 bool32 RUNNING = true;
-square testSqr = {600, 400, 10};
-square lastSqr = {600, 400, 10};
-direction dir = {0, 0};
+square testSqr = {600, 400};
+square lastSqr = {600, 400};
+direction headDir = {0, 0};
+
+square globalSnake[12] = {{6, 1}, {7, 1}, {7, 2}, {7, 3}, {7, 4}, {8, 4}, {9, 4}, {10, 4}, {10, 3}, {10, 2}, {10, 1}, {10, 0}};
+square lastHead;
+bool32 move = true;
+
 int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){ // entry point for Windows GUI
     LARGE_INTEGER ticksPerSecResult;
     QueryPerformanceFrequency(&ticksPerSecResult);
@@ -78,7 +88,9 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
     RUNNING = true;
 
     createBoard();
-    addSquare(testSqr);
+    // addSquare(testSqr);
+    addSnake(globalSnake, 12);
+    lastHead = globalSnake[0];
     HDC deviceContext = GetDC(windowHandle);
     while (RUNNING){
         MSG msg;
@@ -90,14 +102,22 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
             DispatchMessage(&msg);
         }
         
-        if (lastSqr.x != testSqr.x || lastSqr.y != testSqr.y){
-            removeSquare(lastSqr);
-            addSquare(testSqr);
-            char buffer[256];
-            wsprintf(buffer, "x, y: %d, %d\n", testSqr.x, testSqr.y);
-            OutputDebugString(buffer);
-            lastSqr.x = testSqr.x;
-            lastSqr.y = testSqr.y;
+        // if (lastSqr.x != testSqr.x || lastSqr.y != testSqr.y){
+        //     removeSquare(lastSqr);
+        //     addSquare(testSqr);
+        //     char buffer[256];
+        //     wsprintf(buffer, "x, y: %d, %d\n", testSqr.x, testSqr.y);
+        //     OutputDebugString(buffer);
+        //     lastSqr.x = testSqr.x;
+        //     lastSqr.y = testSqr.y;
+        // }
+        
+        if (move){
+            moveSnake(globalSnake, 12);
+            removeSquare(globalSnake[11]);
+            DEBUGprintSnake(globalSnake, 12);
+            OutputDebugString("\n");
+            
         }
 
         updateScreen(deviceContext);
@@ -109,10 +129,12 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info2){
     LRESULT result = 0;
     switch(event){
+        case WM_ACTIVATE:{
+            OutputDebugString("Test\t");
+        }   break;
         case WM_CLOSE:{
             RUNNING = false;
             result = DefWindowProc(hwnd, event, info1, info2);
-            
         }   break;
         case WM_KEYUP:
         case WM_KEYDOWN:{
@@ -122,24 +144,40 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
             if (isDown != wasDown && isDown){
                 switch (VKCode){
                     case VK_UP:{
-                        if (testSqr.y >= testSqr.size){
-                            testSqr.y -= testSqr.size;
-                        }
+                        // if (testSqr.y >= size){
+                        //     testSqr.y -= size;
+                        // }
+                        headDir.right = 0;
+                        headDir.down = -size;
+                        move = true;
+                        OutputDebugString("Up\t");
                     }   break;
                     case VK_DOWN:{
-                        if (testSqr.y < boardHeight - 5*testSqr.size){
-                            testSqr.y += testSqr.size;
-                        }
+                        // if (testSqr.y < boardHeight - 5*size){
+                            //     testSqr.y += size;
+                            // }
+                        headDir.right = 0;
+                        headDir.down = size;
+                        move = true;
+                        OutputDebugString("Down\t");
                     }   break;
                     case VK_LEFT:{
-                        if (testSqr.x >= testSqr.size){
-                            testSqr.x -= testSqr.size;
-                        }
+                        // if (testSqr.x >= size){
+                            //     testSqr.x -= size;
+                            // }
+                        headDir.right = -size;
+                        headDir.down = 0;
+                        move = true;
+                        OutputDebugString("Left\t");
                     }   break;
                     case VK_RIGHT:{
-                        if (testSqr.x <= boardWidth - 4*testSqr.size){
-                            testSqr.x += testSqr.size;
-                        }
+                        // if (testSqr.x <= boardWidth - 4*size){
+                            //     testSqr.x += size;
+                            // }
+                        headDir.right = size;
+                        headDir.down = 0;
+                        move = true;
+                        OutputDebugString("Right\t");
                     }   break;
                 }
             }
@@ -183,10 +221,10 @@ void clearBoard(){
 
 
 void addSquare(square sqr){
-    u32* pixels = (u32*) imagePtr;
+    i32* pixels = (i32*) imagePtr;
     
-    for (u32 i = sqr.y; i < sqr.y + sqr.size; i++){
-        for (u32 j = sqr.x; j < sqr.x + sqr.size; j++ ){
+    for (i32 i = sqr.y; i < sqr.y + size; i++){
+        for (i32 j = sqr.x; j < sqr.x + size; j++ ){
             *(pixels + (i * boardWidth + j)) = white;
         }
     }
@@ -195,8 +233,8 @@ void addSquare(square sqr){
 void removeSquare(square sqr){
     u32* pixels = (u32*) imagePtr;
 
-    for (u32 i = sqr.y; i < sqr.y + sqr.size; i++){
-        for (u32 j = sqr.x; j < sqr.x + sqr.size; j++ ){
+    for (u32 i = sqr.y; i < size; i++){
+        for (u32 j = sqr.x; j < size; j++ ){
             *(pixels + (i * boardWidth + j)) = black;
         }
     }
@@ -205,3 +243,73 @@ void removeSquare(square sqr){
 void updateScreen(HDC deviceContext){
     StretchDIBits(deviceContext,0, 0, boardWidth, boardHeight, 0, 0, boardWidth, boardHeight, imagePtr, &bmpInfo, DIB_RGB_COLORS, SRCCOPY);
 }
+
+void addSnake(square snake[], u16 length){
+    for (u16 i = 0; i < length; i++){
+        snake[i].x *= size;
+        snake[i].y *= size;
+        snake[i].x += 50; // ! TEST
+        snake[i].y += 100; 
+        addSquare(snake[i]);
+    }
+}
+
+void addStructs(square *head, direction dir){
+    if (dir.right){
+        if (head->x >= size && dir.right < 0){
+            head->x += dir.right;
+        }
+        else if (head->x >= boardWidth - size && dir.right > 0){
+            head->x += dir.right;
+        }
+    }
+    else if (dir.down){
+        if (head->y >= size && dir.down < 0){
+            head->y += dir.down;
+        }
+        else if (head->x >= boardHeight - size && dir.down > 0){
+            head->y += dir.down;
+        }
+    }
+
+
+}
+
+void moveSnake(square snake[], u16 length){
+    square headCopy = snake[0];
+    addStructs(&headCopy, headDir);
+    for ( ; length > 1; length--){
+        snake[length - 1] = snake[length - 2];
+    }
+    snake[0] = headCopy;
+    move = false;
+}
+
+void DEBUGprintSnake(square snake[], u16 length){
+    char buffer[1024];
+    char *at = buffer;
+
+    for (u16 i = 0; i < length; i++){
+        u8 charsWritten = wsprintf(at, "(%d, %d), ", snake[i].x, snake[i].y);
+        at += charsWritten;
+    }
+    OutputDebugString(buffer);
+    
+
+}
+
+
+/* Pseudocode
+Imagine a snake:
+[[(6, 1), (7, 1), (7, 2), (7, 3), (7, 4), (8, 4), (9, 4), (10, 4), (10, 3), (10, 2), (10, 1), (10, 0)]
+[(5, 1), (6, 1), (7, 1), (7, 2), (7, 3), (7, 4), (8, 4), (9, 4), (10, 4), (10, 3), (10, 2), (10, 1)]
+[(4, 1), (5, 1), (6, 1), (7, 1), (7, 2), (7, 3), (7, 4), (8, 4), (9, 4), (10, 4), (10, 3), (10, 2)]
+[(3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (7, 2), (7, 3), (7, 4), (8, 4), (9, 4), (10, 4), (10, 3)]
+[(2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (7, 2), (7, 3), (7, 4), (8, 4), (9, 4), (10, 4)]
+[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (7, 2), (7, 3), (7, 4), (8, 4), (9, 4)]
+]
+wtf is the pattern
+direction rn is (0, -1) (Left)
+looks like i might have to start recreating the snake everytime, and find an efficient way later
+
+*/
