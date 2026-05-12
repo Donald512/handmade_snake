@@ -7,8 +7,13 @@
 
 #define boardWidth 640
 #define boardHeight 480
+
 #define bytesPerPixel 4
 #define size 10
+
+#define rightWall (boardWidth - 3*size)
+#define bottomWall (boardHeight - 5*size)
+
 
 #define black 0x00000000
 #define white 0x00FFFFFF    // little endian, in memory stored ABGR
@@ -17,8 +22,10 @@
 typedef uint8_t u8;
 typedef int8_t i8;
 typedef uint16_t u16;
+typedef int16_t i16;
 typedef uint32_t u32;
 typedef int32_t i32;
+typedef uint64_t u64;
 typedef int64_t i64;
 typedef uint32_t bool32;
 
@@ -62,10 +69,15 @@ square globalSnake[12] = {{6, 1}, {7, 1}, {7, 2}, {7, 3}, {7, 4}, {8, 4}, {9, 4}
 square lastHead;
 bool32 move = false;
 
+u16 gameSpeedms = 200;    // 500 ms
+u64 numTicksPerGameSpeedms;
+
 int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){ // entry point for Windows GUI
     LARGE_INTEGER ticksPerSecResult;
     QueryPerformanceFrequency(&ticksPerSecResult);
     i64 ticksPerSec = ticksPerSecResult.QuadPart;
+    u64 ticksPerMs = ticksPerSec/1000;
+    numTicksPerGameSpeedms = gameSpeedms * ticksPerMs;
     
 
     WNDCLASSEXA windowClass = {0};
@@ -95,6 +107,11 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
     spawnSnake(globalSnake, 12);
     lastHead = globalSnake[0];
     HDC deviceContext = GetDC(windowHandle);
+
+    LARGE_INTEGER lastNumTicks, currentNumTicks;
+    QueryPerformanceCounter(&lastNumTicks);
+
+
     while (RUNNING){
         MSG msg;
         while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE /*Remove from queue after checking*/)){
@@ -105,23 +122,22 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
             DispatchMessage(&msg);
         }
         
-        // if (lastSqr.x != testSqr.x || lastSqr.y != testSqr.y){
-        //     removeSquare(lastSqr);
-        //     addSquare(testSqr);
-        //     char buffer[256];
-        //     wsprintf(buffer, "x, y: %d, %d\n", testSqr.x, testSqr.y);
-        //     OutputDebugString(buffer);
-        //     lastSqr.x = testSqr.x;
-        //     lastSqr.y = testSqr.y;
-        // }
-        
-        if (move){
-            moveSnake(globalSnake, 12);
-            removeSquare(globalSnake[11]);
-            DEBUGprintSnake(globalSnake, 12);
-            OutputDebugString("\n");
+        // if (move){
+        //     moveSnake(globalSnake, 12);
+        //     removeSquare(globalSnake[11]);
+        //     DEBUGprintSnake(globalSnake, 12);
+        //     OutputDebugString("\n");
             
+        // }
+
+        QueryPerformanceCounter(&currentNumTicks);
+        if ((u64)currentNumTicks.QuadPart - (u64)lastNumTicks.QuadPart >= numTicksPerGameSpeedms){
+            removeSquare(globalSnake[11]);
+            moveSnake(globalSnake, 12);
+            DEBUGprintStruct(globalSnake[0]);
+            lastNumTicks = currentNumTicks;
         }
+
 
         updateScreen(deviceContext);
     }
@@ -180,10 +196,10 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
                     }   break;
                 }
             }
-        }
+        }   break;
         default:{
             result = DefWindowProc(hwnd, event, info1, info2);
-        }
+        }   break;
     }
     return result;
 }
@@ -260,14 +276,14 @@ void addSnake(square snake[], u16 length){
 
 void addStructs(square *head, direction dir){
     if (dir.right){
-        u16 resultX = head->x + dir.right;
-        if (resultX >= 0 && resultX <= boardWidth){
+        i16 resultX = head->x + dir.right;
+        if (resultX >= 0 && resultX <= rightWall){
             head->x = resultX;
         }
     }
     else if (dir.down){
-        u16 resultY = head->y + dir.down;
-        if (resultY >= 0 && resultY <= boardHeight){
+        i16 resultY = head->y + dir.down;
+        if (resultY >= 0 && resultY <= bottomWall){
             head->y = resultY;
         }
     }
@@ -280,8 +296,9 @@ void addStructs(square *head, direction dir){
 void moveSnake(square snake[], u16 length){
     square headCopy = snake[0];
     addStructs(&headCopy, headDir);
-    for ( ; length > 1; length--){
-        snake[length - 1] = snake[length - 2];
+    u16 i = length;
+    for ( ; i > 1; i--){
+        snake[i - 1] = snake[i - 2];
     }
     snake[0] = headCopy;
     move = false;
