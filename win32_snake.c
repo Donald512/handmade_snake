@@ -42,10 +42,13 @@ void addSquare(square sqr);
 void removeSquare(square sqr);
 void updateScreen(HDC deviceContext);
 void clearBoard();
-void addSnake(square snake[], u16 length);
+void spawnSnake(square snake[], u16 length);
 void addStructs(square *head, direction dir);
 void moveSnake(square snake[], u16 length);
 void DEBUGprintSnake(square snake[], u16 length);
+void DEBUGprintDir(direction dir);
+void DEBUGprintStruct(square part);
+void addSnake(square snake[], u16 length);
 
 BITMAPINFO bmpInfo = {0};
 void* imagePtr = NULL;
@@ -57,7 +60,7 @@ direction headDir = {0, 0};
 
 square globalSnake[12] = {{6, 1}, {7, 1}, {7, 2}, {7, 3}, {7, 4}, {8, 4}, {9, 4}, {10, 4}, {10, 3}, {10, 2}, {10, 1}, {10, 0}};
 square lastHead;
-bool32 move = true;
+bool32 move = false;
 
 int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){ // entry point for Windows GUI
     LARGE_INTEGER ticksPerSecResult;
@@ -89,7 +92,7 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 
     createBoard();
     // addSquare(testSqr);
-    addSnake(globalSnake, 12);
+    spawnSnake(globalSnake, 12);
     lastHead = globalSnake[0];
     HDC deviceContext = GetDC(windowHandle);
     while (RUNNING){
@@ -144,39 +147,35 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
             if (isDown != wasDown && isDown){
                 switch (VKCode){
                     case VK_UP:{
-                        // if (testSqr.y >= size){
-                        //     testSqr.y -= size;
-                        // }
-                        headDir.right = 0;
-                        headDir.down = -size;
-                        move = true;
+                        if (headDir.down <= 0){  // cant move in opposite direction blocker
+                            headDir.right = 0;
+                            headDir.down = -size;
+                            move = true;
+                        }
                         OutputDebugString("Up\t");
                     }   break;
                     case VK_DOWN:{
-                        // if (testSqr.y < boardHeight - 5*size){
-                            //     testSqr.y += size;
-                            // }
-                        headDir.right = 0;
-                        headDir.down = size;
-                        move = true;
+                        if (headDir.down >= 0){ 
+                            headDir.right = 0;
+                            headDir.down = size;
+                            move = true;
+                        }
                         OutputDebugString("Down\t");
                     }   break;
                     case VK_LEFT:{
-                        // if (testSqr.x >= size){
-                            //     testSqr.x -= size;
-                            // }
-                        headDir.right = -size;
-                        headDir.down = 0;
-                        move = true;
+                        if (headDir.right <= 0){ 
+                            headDir.right = -size;
+                            headDir.down = 0;
+                            move = true;
+                        }
                         OutputDebugString("Left\t");
                     }   break;
                     case VK_RIGHT:{
-                        // if (testSqr.x <= boardWidth - 4*size){
-                            //     testSqr.x += size;
-                            // }
-                        headDir.right = size;
-                        headDir.down = 0;
-                        move = true;
+                        if (headDir.right >= 0){ 
+                            headDir.right = size;
+                            headDir.down = 0;
+                            move = true;
+                        }
                         OutputDebugString("Right\t");
                     }   break;
                 }
@@ -233,8 +232,8 @@ void addSquare(square sqr){
 void removeSquare(square sqr){
     u32* pixels = (u32*) imagePtr;
 
-    for (u32 i = sqr.y; i < size; i++){
-        for (u32 j = sqr.x; j < size; j++ ){
+    for (u32 i = sqr.y; i < sqr.y + size; i++){
+        for (u32 j = sqr.x; j < sqr.x + size; j++ ){
             *(pixels + (i * boardWidth + j)) = black;
         }
     }
@@ -244,33 +243,36 @@ void updateScreen(HDC deviceContext){
     StretchDIBits(deviceContext,0, 0, boardWidth, boardHeight, 0, 0, boardWidth, boardHeight, imagePtr, &bmpInfo, DIB_RGB_COLORS, SRCCOPY);
 }
 
-void addSnake(square snake[], u16 length){
+void spawnSnake(square snake[], u16 length){
     for (u16 i = 0; i < length; i++){
         snake[i].x *= size;
         snake[i].y *= size;
-        snake[i].x += 50; // ! TEST
-        snake[i].y += 100; 
+        // snake[i].x += 50; // ! TEST
+        // snake[i].y += 100; 
+        addSquare(snake[i]);
+    }
+}
+void addSnake(square snake[], u16 length){
+    for (u16 i = 0; i < length; i++){
         addSquare(snake[i]);
     }
 }
 
 void addStructs(square *head, direction dir){
     if (dir.right){
-        if (head->x >= size && dir.right < 0){
-            head->x += dir.right;
-        }
-        else if (head->x >= boardWidth - size && dir.right > 0){
-            head->x += dir.right;
+        u16 resultX = head->x + dir.right;
+        if (resultX >= 0 && resultX <= boardWidth){
+            head->x = resultX;
         }
     }
     else if (dir.down){
-        if (head->y >= size && dir.down < 0){
-            head->y += dir.down;
-        }
-        else if (head->x >= boardHeight - size && dir.down > 0){
-            head->y += dir.down;
+        u16 resultY = head->y + dir.down;
+        if (resultY >= 0 && resultY <= boardHeight){
+            head->y = resultY;
         }
     }
+    // DEBUGprintStruct(*head);
+    // DEBUGprintDir(dir);
 
 
 }
@@ -283,6 +285,7 @@ void moveSnake(square snake[], u16 length){
     }
     snake[0] = headCopy;
     move = false;
+    addSnake(snake, length);
 }
 
 void DEBUGprintSnake(square snake[], u16 length){
@@ -294,10 +297,18 @@ void DEBUGprintSnake(square snake[], u16 length){
         at += charsWritten;
     }
     OutputDebugString(buffer);
-    
-
 }
 
+void DEBUGprintStruct(square part){
+    char buffer[256];
+    wsprintf(buffer, "(%d, %d)\n", part.x, part.y);
+    OutputDebugString(buffer);
+}
+void DEBUGprintDir(direction dir){
+    char buffer[256];
+    wsprintf(buffer, "(%d, %d)\n", dir.right, dir.down);
+    OutputDebugString(buffer);
+}
 
 /* Pseudocode
 Imagine a snake:
