@@ -1,4 +1,5 @@
 <b>Win32 Snake: Using windows.h and stdint.h only</b>
+
 A C implementation of the classic Snake game, built using the Win32 API. No game engines, just software rendering with the CPU.
 Made this with windows.h to run on a modern laptop first with infinite memory, so I can build it on an Arduino using an OLED screen, so the difficuly is less difficult.
 
