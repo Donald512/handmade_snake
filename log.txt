@@ -1,1 +1,60 @@
 LRESULT Wndproc(HWND param1, UINT param2, WPARAM param3, LPARAM param4){} must return an LRESULT, or DefWindowProc(...) or else window wont open
+
+
+----------------------------------------------------------------------------------------------
+bool32 addStructs(square *head, direction dir){
+    i16 resultX = head->x + dir.right;
+    i16 resultY = head->y + dir.down;
+    if (dir.right){
+        if (resultX >= 0 && resultX <= rightWall){
+            head->x = resultX;
+        }
+        else {
+            return false;
+        }
+    }
+    else if (dir.down){
+        if (resultY >= 0 && resultY <= bottomWall){
+            head->y = resultY;
+        }
+        else {
+            return false;
+        }
+    }
+    for (u16 i = 1; i < currentLevel; i++){
+        if (head[0].x == head[i].x && head[0].y == head[i].y){
+            return false;
+        }
+    }
+    
+    OutputDebugString("\n");
+    DEBUGprintSnake(head, currentLevel);
+    OutputDebugString("\n");
+    
+    return true;
+}
+
+void moveSnake(){
+    square* head = snakePtr;
+    square headCopy = head[0];
+    if (!addStructs(&headCopy, headDir)){
+        RUNNING = false;
+        return;
+    }
+    u16 i = currentLevel;
+    for ( ; i > 1; i--){
+        head[i - 1] = head[i - 2];
+    }
+    head[0] = headCopy;
+    drawSnake(head, currentLevel);
+}
+
+This bug is sneaky because, in the memory window, it shows that snakePtr has the correct 
+coordinates, but the OutputDebugString prints garbage, this is one of the prints it gave me:
+    (420, 110), (0, 57598), (539, 0),
+    (420, 120), (0, 57598), (539, 0),
+    (420, 130), (0, 57598), (539, 0),
+the head changes, but the rest of the body is garbage, and not a multiple of size .
+so the collision logic didnt work because I passed a copy of the pointer, not the actual pointer, 
+so only the head was correct and the rest of the surroundings in the stack was garbage memory
+----------------------------------------------------------------------------------------------

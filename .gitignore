@@ -1,4 +1,5 @@
 Build/
+win32_snake copy.c
 *.exe
 *.obj
 *.pdb
