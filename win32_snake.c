@@ -14,6 +14,8 @@
 #define rightWall (boardWidth - 3*size)
 #define bottomWall (boardHeight - 5*size)
 
+#define maxNumPartsSnake (rightWall/size * bottomWall/size)
+
 
 #define black 0x00000000
 #define white 0x00FFFFFF    // little endian, in memory stored ABGR
@@ -42,6 +44,7 @@ typedef struct{
     i8 down;
 }   direction;
 
+u32 snakeSize = maxNumPartsSnake * sizeof(square);
 
 LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info2);
 void createBoard();
@@ -56,18 +59,22 @@ void DEBUGprintSnake(square snake[], u16 length);
 void DEBUGprintDir(direction dir);
 void DEBUGprintStruct(square part);
 void addSnake(square snake[], u16 length);
+void createSnake();
+void move2Snake();
 
 BITMAPINFO bmpInfo = {0};
 void* imagePtr = NULL;
+void* snakePtr = NULL;
 
 bool32 RUNNING = true;
 square testSqr = {600, 400};
 square lastSqr = {600, 400};
 direction headDir = {0, 0};
 
+u16 currentLevel = 1;
 square globalSnake[12] = {{6, 1}, {7, 1}, {7, 2}, {7, 3}, {7, 4}, {8, 4}, {9, 4}, {10, 4}, {10, 3}, {10, 2}, {10, 1}, {10, 0}};
 square lastHead;
-bool32 move = false;
+bool32 ateApple = false;
 
 u16 gameSpeedms = 200;    // 500 ms
 u64 numTicksPerGameSpeedms;
@@ -103,8 +110,8 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
     RUNNING = true;
 
     createBoard();
-    // addSquare(testSqr);
-    spawnSnake(globalSnake, 12);
+    createSnake();
+    // spawnSnake(globalSnake, 12);
     lastHead = globalSnake[0];
     HDC deviceContext = GetDC(windowHandle);
 
@@ -132,8 +139,8 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 
         QueryPerformanceCounter(&currentNumTicks);
         if ((u64)currentNumTicks.QuadPart - (u64)lastNumTicks.QuadPart >= numTicksPerGameSpeedms){
-            removeSquare(globalSnake[11]);
-            moveSnake(globalSnake, 12);
+            removeSquare(((square*)snakePtr)[currentLevel - 1]); 
+            move2Snake();
             DEBUGprintStruct(globalSnake[0]);
             lastNumTicks = currentNumTicks;
         }
@@ -166,7 +173,6 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
                         if (headDir.down <= 0){  // cant move in opposite direction blocker
                             headDir.right = 0;
                             headDir.down = -size;
-                            move = true;
                         }
                         OutputDebugString("Up\t");
                     }   break;
@@ -174,7 +180,6 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
                         if (headDir.down >= 0){ 
                             headDir.right = 0;
                             headDir.down = size;
-                            move = true;
                         }
                         OutputDebugString("Down\t");
                     }   break;
@@ -182,7 +187,6 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
                         if (headDir.right <= 0){ 
                             headDir.right = -size;
                             headDir.down = 0;
-                            move = true;
                         }
                         OutputDebugString("Left\t");
                     }   break;
@@ -190,10 +194,12 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
                         if (headDir.right >= 0){ 
                             headDir.right = size;
                             headDir.down = 0;
-                            move = true;
                         }
                         OutputDebugString("Right\t");
                     }   break;
+                    case 'W':{
+                        currentLevel++;
+                    }
                 }
             }
         }   break;
@@ -301,7 +307,6 @@ void moveSnake(square snake[], u16 length){
         snake[i - 1] = snake[i - 2];
     }
     snake[0] = headCopy;
-    move = false;
     addSnake(snake, length);
 }
 
@@ -326,6 +331,33 @@ void DEBUGprintDir(direction dir){
     wsprintf(buffer, "(%d, %d)\n", dir.right, dir.down);
     OutputDebugString(buffer);
 }
+
+void createSnake(){
+    // pointer returned to start of memory will be head
+    snakePtr = VirtualAlloc(0, snakeSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    
+    square* head = snakePtr;
+    for (u8 i = 0; i < currentLevel ; i++){
+        head[i] = globalSnake[i];
+        head[i].x *= size;
+        head[i].y *= size;
+        addSquare(head[i]);
+    }
+}
+
+void move2Snake(){
+    square* head = snakePtr;
+    square headCopy = head[0];
+    addStructs(&headCopy, headDir);
+    u16 i = currentLevel;
+    for ( ; i > 1; i--){
+        head[i - 1] = head[i - 2];
+    }
+    head[0] = headCopy;
+    addSnake(head, currentLevel);
+}
+
+
 
 /* Pseudocode
 Imagine a snake:
