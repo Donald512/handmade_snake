@@ -9,7 +9,7 @@
 #define boardHeight 480
 
 #define bytesPerPixel 4
-#define size 10
+#define size 20
 
 #define minimumGameSpeed 50
 
@@ -83,7 +83,7 @@ u16 currentLevel = 1;
 square apple;
 bool32 FAILED = false;
 
-u16 gameSpeedms = 200;    // 500 ms
+u16 gameSpeedms = 200;
 u64 numTicksPerGameSpeedms;
 
 u32 seed;
@@ -130,7 +130,6 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 
 
     while (RUNNING){
-        numTicksPerGameSpeedms = gameSpeedms * ticksPerMs;
         MSG msg;
         while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE /*Remove from queue after checking*/)){
             if (msg.message == WM_QUIT){
@@ -146,9 +145,6 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
                 currentLevel++;
                 eraseSquare(apple);
                 generateApple();
-                if (currentLevel && !(currentLevel % 10) && gameSpeedms < minimumGameSpeed){
-                    gameSpeedms -= 10;
-                }
             }
             eraseSquare(((square*)snakePtr)[currentLevel - 1]); 
             moveSnake();
