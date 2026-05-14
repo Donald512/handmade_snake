@@ -1,3 +1,4 @@
+<img width="800" height="422" alt="ScreenRecording2026-05-13231645-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/024cbf48-5e36-4692-afe1-738522929559" />
 <b>Win32 Snake: Using windows.h and stdint.h only</b>
 
 
