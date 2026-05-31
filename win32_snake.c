@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <stdint.h>
+#include <font8x8.h>
 
 #define errorToReturn 1
 #define true 1
@@ -13,8 +14,8 @@
 
 #define minimumGameSpeed 50
 
-#define rightWall (boardWidth - 3*size)
-#define bottomWall (boardHeight - 5*size)
+#define rightWall (boardWidth - size)   // because, the each sqr represents the top left corner, so, a pixel of 620, covers all the way from 621 to 640
+#define bottomWall (boardHeight - size)
 
 #define maxNumPartsSnake (rightWall/size * bottomWall/size)
 
@@ -26,6 +27,17 @@
 #define largePrimeNumber 1103515245
 #define smallConstant 12345 // make sure seed doesnt become 0
 #define cleaner ~(1 << 31) // this is 01111111 11111111 11111111 11111111 to make sure the seed is positive
+
+// ! ///////////////// DPI SCALING CODE
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((void*)-4)
+#endif
+
+// Create the function pointer
+typedef BOOL (WINAPI *SET_DPI_CTX_FPTR)(DPI_AWARENESS_CONTEXT CTX_TYPE);
+// typedef FARPROC GENERIC_FPTR;
+void DISABLE_DPI_SCALING();
+// ! ///////////////// DPI SCALING CODE
 
 
 typedef uint8_t u8;
@@ -68,6 +80,7 @@ u32 getRandom();
 i32 random(i32 min, i32 max);
 void generateApple();
 void drawApple();
+void drawApple();
 bool32 headOnApple();
 
 BITMAPINFO bmpInfo = {0};
@@ -75,6 +88,7 @@ void* imagePtr = NULL;
 void* snakePtr = NULL;
 
 bool32 RUNNING = true;
+bool32 acceptInput = false;
 square testSqr = {600, 400};
 square lastSqr = {600, 400};
 direction headDir = {0, 0};
@@ -100,6 +114,7 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
     seed = lastNumTicks.LowPart;     // happens once
 
 
+    DISABLE_DPI_SCALING();
 
     WNDCLASSEXA windowClass = {0};
     windowClass.cbSize = sizeof(WNDCLASSEX);
@@ -114,7 +129,15 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
         return errorToReturn;
     }
 
-    HWND windowHandle = CreateWindowEx(0, windowClass.lpszClassName, "Snake Game",WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 640, 480, 0, 0, hInstance, 0);
+    u16 clientAreaWindowWidth = 640;
+    u16 clientAreaWindowHeight = 480;
+    i16 clientAreaXPos = 40;    // ! random values
+    i16 clientAreaYPos = 40;
+
+    DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
+    RECT desiredRect = {clientAreaXPos, clientAreaYPos, clientAreaXPos + clientAreaWindowWidth, clientAreaYPos + clientAreaWindowHeight};
+    AdjustWindowRectEx(&desiredRect, dwStyle, false /* No menu*/, 0);
+    HWND windowHandle = CreateWindowExA(0, windowClass.lpszClassName, "Snake Game", dwStyle , clientAreaXPos, clientAreaYPos, desiredRect.right - desiredRect.left, desiredRect.bottom - desiredRect.top, 0, 0, hInstance, 0);
 
     if (!windowHandle){
         OutputDebugString("Error creating windowHandle (NULL)");
@@ -141,6 +164,7 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
         
         QueryPerformanceCounter(&currentNumTicks);
         if ((u64)currentNumTicks.QuadPart - (u64)lastNumTicks.QuadPart >= numTicksPerGameSpeedms){
+            acceptInput = true;
             if (headOnApple()){
                 currentLevel++;
                 eraseSquare(apple);
@@ -149,6 +173,7 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
             eraseSquare(((square*)snakePtr)[currentLevel - 1]); 
             moveSnake();
             lastNumTicks = currentNumTicks;
+            acceptInput = false;
         }
 
 
@@ -176,28 +201,28 @@ LRESULT Win32MainWindowCallback(HWND hwnd, UINT event, WPARAM info1, LPARAM info
             if (isDown != wasDown && isDown){
                 switch (VKCode){
                     case VK_UP:{
-                        if (headDir.down <= 0){  // cant move in opposite direction blocker
+                        if (acceptInput && headDir.down <= 0){  // cant move in opposite direction blocker
                             headDir.right = 0;
                             headDir.down = -size;
                         }
                         // OutputDebugString("Up\t");
                     }   break;
                     case VK_DOWN:{
-                        if (headDir.down >= 0){ 
+                        if (acceptInput && headDir.down >= 0){ 
                             headDir.right = 0;
                             headDir.down = size;
                         }
                         // OutputDebugString("Down\t");
                     }   break;
                     case VK_LEFT:{
-                        if (headDir.right <= 0){ 
+                        if (acceptInput && headDir.right <= 0){ 
                             headDir.right = -size;
                             headDir.down = 0;
                         }
                         // OutputDebugString("Left\t");
                     }   break;
                     case VK_RIGHT:{
-                        if (headDir.right >= 0){ 
+                        if (acceptInput && headDir.right >= 0){ 
                             headDir.right = size;
                             headDir.down = 0;
                         }
@@ -382,6 +407,18 @@ bool32 headOnApple(){
 }
 
 
+
+void DISABLE_DPI_SCALING(){
+    HMODULE user32 = LoadLibraryA("user32.dll");
+    if (!user32) return;
+
+    SET_DPI_CTX_FPTR SetProcessDpiAwarenessContext_= (SET_DPI_CTX_FPTR) GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+
+    if (SetProcessDpiAwarenessContext_){
+        SetProcessDpiAwarenessContext_(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+
+}
 
 
 /* Pseudocode
